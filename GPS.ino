@@ -54,8 +54,7 @@ TinyGPSPlus gps;
 // Emulierter Port zum GPS Geraet
 SoftwareSerial gpsPort(RX, TX);
 
-void setup()
-{
+void setup() {
   /***
   * ST7735-Chip initialisieren (INITR_BLACKTAB / INITR_REDTAB / INITR_GREENTAB) 
   ***/
@@ -67,113 +66,108 @@ void setup()
   tft.setCursor(0, 0);
   tft.setTextColor(ST7735_WHITE);
   tft.setTextSize(1);
+
+  drawFrame();
   
   // Verbindung mit GPS-Modul
   gpsPort.begin(GPSBaud);
   Serial.begin(9600);
 }
 
-void loop()
-{
+void loop() {
   while (gpsPort.available() > 0) // Daten vorhanden?
     if (gps.encode(gpsPort.read())) {
       showPositionData(); // ja, dann Ausgabe auf Display
     }
 
-  if (millis() > 5000 && gps.charsProcessed() < 10)
-  {
+  if (millis() > 5000 && gps.charsProcessed() < 10) {
     Serial.println("Fehler: GPS Modul nicht gefunden");
     while(true);
   }
 }
 
-void showPositionData()
-{
-  if (gps.date.isValid() && gps.time.isValid())
-  {
-    tft.setTextColor(ST7735_WHITE, ST7735_BLACK); // besser als fillScreen. Kein flackern mehr bei sekunden etc.
-    tft.setCursor(0, 0);
-    tft.println("Local Date & Time");
-    tft.println("---------------------");
-
+void showPositionData() {
+  if (gps.date.isValid() && gps.time.isValid()) {
+    displayText(4, 4, "Local Date & Time", ST7735_WHITE, ST7735_BLACK);
+    
     utc = tmConvert_t(gps.date.year(), gps.date.month(), gps.date.day(), gps.time.hour(), gps.time.minute(), gps.time.second());
     ltime = CE.toLocal(utc, &tcr);
     sprintf(localTime, "%.02d:%.02d:%.02d", hour(ltime), minute(ltime), second(ltime));
     sprintf(localDate, "%.02d.%02d.%d", day(ltime), month(ltime), year(ltime));
-    tft.print("Date : ");
-    tft.println(localDate);
-    tft.print("Time : ");
-    tft.println(localTime);
+    
+    displayText(4, 20, "Date : ", ST7735_WHITE, ST7735_BLACK);
+    displayText(4, 30, "Time : ", ST7735_WHITE, ST7735_BLACK);
+    
+    displayText(50, 20, localDate, ST7735_WHITE, ST7735_BLACK);
+    displayText(50, 30, localTime, ST7735_WHITE, ST7735_BLACK);
   }
  
-
+  displayText(4, 50, "Coordinates", ST7735_WHITE, ST7735_BLACK);
+  
   // Refresh coordinates after a defined interval
   curTime = millis();
-  if (gps.location.isValid() && (((curTime - gpstimer ) > GPSTIME ) || (curTime < gpstimer)))
-//  if (gps.location.isValid())
-  {
-    gpstimer = curTime;
-    tft.println("");
-    tft.println("Coordinates");
-    tft.println("---------------------");
-    tft.print("Lat: ");
-    int degLat = gps.location.lat();
-    float minutesRemainderLat = abs(gps.location.lat() - degLat) * 60;
-    int arcMinutesLat = minutesRemainderLat;
-    int arcSecondsLat = (minutesRemainderLat - arcMinutesLat) * 60;
-    tft.print(degLat < 10 ? "0" : "");
-    tft.print(degLat);
-    tft.print((char)247); // Grad
-    tft.print(" ");
-    tft.print(arcMinutesLat < 10 ? "0" : "");
-    tft.print(arcMinutesLat);
-    tft.print("' ");
-    tft.print(arcSecondsLat < 10 ? "0" : "");
-    tft.print(arcSecondsLat);
-    tft.print("\"");   
-    tft.println(gps.location.rawLat().negative ? " S" : " N");
-    
-//    tft.print(" (");
-//    tft.print(gps.location.lat(), 3);
-//    tft.println(")");
+//  if (gps.location.isValid() && (((curTime - gpstimer ) > GPSTIME ) || (curTime < gpstimer)))
+  if (gps.location.isValid()) {
+    if (((curTime - gpstimer ) > GPSTIME ) || (curTime < gpstimer)) {
+      displayText(40, 70, "No GPS fix ...", ST7735_BLACK, ST7735_BLACK);
+      
+      gpstimer = curTime;
+      
+      int degLat = gps.location.lat();
+      float minutesRemainderLat = abs(gps.location.lat() - degLat) * 60;
+      int arcMinutesLat = minutesRemainderLat;
+      int arcSecondsLat = (minutesRemainderLat - arcMinutesLat) * 60;
 
-    tft.print("Lon: ");
-//    char * myLon = DegreesToDegMinSec(gps.location.lng());
-//    tft.print(myLon);
-    int degLon = gps.location.lng();
-    float minutesRemainderLon = abs(gps.location.lng() - degLon) * 60;
-    int arcMinutesLon = minutesRemainderLon;
-    int arcSecondsLon = (minutesRemainderLon - arcMinutesLon) * 60;
-    tft.print(degLon < 10 ? "0" : "");
-    tft.print(degLon);
-    tft.print((char)247); // Grad
-    tft.print(" ");
-    tft.print(arcMinutesLon < 10 ? "0" : "");
-    tft.print(arcMinutesLon);
-    tft.print("' ");
-    tft.print(arcSecondsLon < 10 ? "0" : "");
-    tft.print(arcSecondsLon);
-    tft.print("\"");
-    tft.println(gps.location.rawLng().negative ? " W" : " E"); 
+      String latitude = (degLat < 10 ? "0" : "");
+      latitude += degLat;
+      latitude += ((char)247);
+      latitude += " ";
+      latitude += (arcMinutesLat < 10 ? "0" : "");
+      latitude += arcMinutesLat;
+      latitude += "' ";
+      latitude += (arcSecondsLat < 10 ? "0" : "");
+      latitude += arcSecondsLat;
+      latitude += "\"";
+      latitude += (gps.location.rawLat().negative ? " S" : " N");
 
-//    tft.print(" (");
-//    tft.print(gps.location.lng() < 10 ? "0" : "");
-//    tft.print(gps.location.lng(), 3);
-//    tft.println(")");
+      displayText(4, 65, "Lat : ", ST7735_WHITE, ST7735_BLACK);
+      displayText(50, 65, latitude, ST7735_WHITE, ST7735_BLACK);
+      displayText(50, 75, "(" + String(gps.location.lat(), 6) + ")", ST7735_WHITE, ST7735_BLACK);
+      
+      int degLon = gps.location.lng();
+      float minutesRemainderLon = abs(gps.location.lng() - degLon) * 60;
+      int arcMinutesLon = minutesRemainderLon;
+      int arcSecondsLon = (minutesRemainderLon - arcMinutesLon) * 60;
 
-    if (gps.altitude.isValid())
-    {
-      tft.println("");
-      tft.print("Alt: ");
-      tft.print(gps.altitude.meters());
-      tft.println(" m");
+      String longitude = (degLon < 10 ? "0" : "");
+      longitude += degLon;
+      longitude += ((char)247);
+      longitude += " ";
+      longitude += (arcMinutesLon < 10 ? "0" : "");
+      longitude += arcMinutesLon;
+      longitude += "' ";
+      longitude += (arcSecondsLon < 10 ? "0" : "");
+      longitude += arcSecondsLon;
+      longitude += "\"";
+      longitude += (gps.location.rawLng().negative ? " W" : " E");
+
+      displayText(4, 90, "Lon : ", ST7735_WHITE, ST7735_BLACK);
+      displayText(50,90, longitude, ST7735_WHITE, ST7735_BLACK);
+      displayText(50,100, "(" + String(gps.location.lng(), 6) + ")", ST7735_WHITE, ST7735_BLACK);
+  
+      if (gps.altitude.isValid()) {
+        String alt = String((int) gps.altitude.meters());
+        alt += " m";
+        displayText(4, 110, "Alt : ", ST7735_WHITE, ST7735_BLACK);
+        displayText(50, 110, alt, ST7735_WHITE, ST7735_BLACK);
+      }
     }
-    
+  } else {
+    displayText(40, 70, "No GPS fix ...", ST7735_RED, ST7735_BLACK);
   }
 }
 
-time_t tmConvert_t(int YYYY, byte MM, byte DD, byte hh, byte mm, byte ss)
-{
+time_t tmConvert_t(int YYYY, byte MM, byte DD, byte hh, byte mm, byte ss) {
   tmElements_t tmSet;
   tmSet.Year = YYYY - 1970;
   tmSet.Month = MM;
@@ -182,4 +176,18 @@ time_t tmConvert_t(int YYYY, byte MM, byte DD, byte hh, byte mm, byte ss)
   tmSet.Minute = mm;
   tmSet.Second = ss;
   return makeTime(tmSet); //convert to time_t
+}
+
+void drawFrame(){
+  tft.drawRect(0,0,160,128,ST7735_WHITE);
+  tft.drawLine(1,15,160,15,ST7735_WHITE);
+  tft.drawLine(1,60,160,60,ST7735_WHITE);
+  
+}
+
+//void displayText(uint16_t x, uint16_t y, char *text , uint16_t color, uint16_t bgcolor) {
+void displayText(uint16_t x, uint16_t y, String text , uint16_t color, uint16_t bgcolor) {
+  tft.setCursor(x, y);
+  tft.setTextColor(color, bgcolor);
+  tft.print(text);
 }
