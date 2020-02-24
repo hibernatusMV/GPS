@@ -1,5 +1,4 @@
-/* Pinnung
- *  Display (Pin) - Arduino Nano
+/* Display (Pin) - Arduino Nano
  *  GND  (1) - GND  
  *  VCC  (2) - 5V
  *  SCK  (3) - D13
@@ -8,29 +7,33 @@
  *  RS   (6) - D9
  *  CS   (7) - D10
  *  LEDA (8) - 3.3V
- *  
- *  LEDA kann auch an 5V doch dann wird das Display sehr schnell sehr heiß - was ich nicht für optimal halte.
- *  Beim Betrieb mit 3.3V ist das Display nur minimal dunkler und bleibt kalt.
  */
 
-#define TFT_PIN_CS   10 // Arduino-Pin an Display CS   
-#define TFT_PIN_DC   9  // Arduino-Pin an 
-#define TFT_PIN_RST  8  // Arduino Reset-Pin
+/* GPS (Pin) - Arduino Nano 
+ * GND  - GND
+ * VCC  - 5V
+ * RX   - D4
+ * TX   - D3
+ */
 
-#define GPSTIME   5000              // GPS coordinates are shown every 5s
+#define TFT_PIN_CS   10 // Arduino pin on display CS   
+#define TFT_PIN_DC   9  // Arduino pin on display DC
+#define TFT_PIN_RST  8  // Arduino pin on display reset pin
+
+#define GPSTIME   5000 // GPS coordinates are shown every 5s
 
 #include <TinyGPS++.h>
 #include <SoftwareSerial.h>
-#include <SPI.h>             // SPI für die Kommunikation
-#include <Adafruit_GFX.h>    // Adafruit Grafik-Bibliothek wird benötigt
-#include <Adafruit_ST7735.h> // Adafruit ST7735-Bibliothek wird benötigt
+#include <SPI.h>             // SPI for communication
+#include <Adafruit_GFX.h>    // Adafruit grafic library
+#include <Adafruit_ST7735.h> // Adafruit ST7735 library
 #include <Timezone.h>
 
-Adafruit_ST7735 tft = Adafruit_ST7735(TFT_PIN_CS, TFT_PIN_DC, TFT_PIN_RST);  // ST7735-Bibliothek Setup
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_PIN_CS, TFT_PIN_DC, TFT_PIN_RST);  // ST7735 library setup
 
-// Verwendete digitale Pins für SoftwareSerial
+// Used digital pins for SoftwareSerial
 static const int RX = 3, TX = 4;
-// !!! Baudrate des GPS-Moduls: Anpassung an eigene HW notwendig
+// !!! connection speed GPS module: adaption to own hardware necessary if different
 static const uint32_t GPSBaud = 9600;
 
 // Change this to suit your Time Zone
@@ -48,15 +51,15 @@ char localDate[32];
 long  gpstimer;
 long  curTime;
 
-// Zugriff auf TinyGPS++ ueber gps
+// Access to TinyGPS++ from gps
 TinyGPSPlus gps;
 
-// Emulierter Port zum GPS Geraet
+// Emulated port to GPS module
 SoftwareSerial gpsPort(RX, TX);
 
 void setup() {
   /***
-  * ST7735-Chip initialisieren (INITR_BLACKTAB / INITR_REDTAB / INITR_GREENTAB) 
+  * ST7735 Chip initialize (INITR_BLACKTAB / INITR_REDTAB / INITR_GREENTAB) 
   ***/
   tft.initR(INITR_BLACKTAB);
 
@@ -69,19 +72,20 @@ void setup() {
 
   drawFrame();
   
-  // Verbindung mit GPS-Modul
+  // connection parameters to GP module
   gpsPort.begin(GPSBaud);
   Serial.begin(9600);
 }
 
 void loop() {
-  while (gpsPort.available() > 0) // Daten vorhanden?
+  while (gpsPort.available() > 0) // data available?
     if (gps.encode(gpsPort.read())) {
-      showPositionData(); // ja, dann Ausgabe auf Display
+      showPositionData(); // yes, print output to display
     }
 
   if (millis() > 5000 && gps.charsProcessed() < 10) {
     Serial.println("Fehler: GPS Modul nicht gefunden");
+    drawSatellite(130, 25, ST7735_RED);
     while(true);
   }
 }
@@ -103,14 +107,20 @@ void showPositionData() {
   }
  
   displayText(4, 50, "Coordinates", ST7735_WHITE, ST7735_BLACK);
+
+  if (gps.location.isValid()) {
+    // GPS fix established
+    drawSatellite(130, 25, ST7735_GREEN);
+  } else {
+    // No GPS fix
+    drawSatellite(130, 25, ST7735_WHITE);
+  }
   
   // Refresh coordinates after a defined interval
   curTime = millis();
 //  if (gps.location.isValid() && (((curTime - gpstimer ) > GPSTIME ) || (curTime < gpstimer)))
   if (gps.location.isValid()) {
     if (((curTime - gpstimer ) > GPSTIME ) || (curTime < gpstimer)) {
-      displayText(40, 70, "No GPS fix ...", ST7735_BLACK, ST7735_BLACK);
-      
       gpstimer = curTime;
       
       int degLat = gps.location.lat();
@@ -162,8 +172,6 @@ void showPositionData() {
         displayText(50, 110, alt, ST7735_WHITE, ST7735_BLACK);
       }
     }
-  } else {
-    displayText(40, 70, "No GPS fix ...", ST7735_RED, ST7735_BLACK);
   }
 }
 
@@ -183,6 +191,29 @@ void drawFrame(){
   tft.drawLine(1,15,160,15,ST7735_WHITE);
   tft.drawLine(1,60,160,60,ST7735_WHITE);
   
+}
+
+void drawSatellite(uint16_t x, uint16_t y, uint16_t color){
+  tft.drawLine((x + 2), (y + 7), (x + 7), (y + 3), color);
+  tft.drawLine((x + 7), (y + 3), (x + 9), (y + 5), color);
+  tft.drawLine((x + 5), (y + 9), (x + 9), (y + 5), color);
+  tft.drawLine((x + 2), (y + 7), (x + 5), (y + 9), color);
+
+  tft.drawLine((x + 1), (y + 1), (x + 2), y, color);
+  tft.drawLine((x + 2), y, (x + 6), (y + 4), color);
+  tft.drawLine((x + 1), (y + 1), (x + 4), (y + 4), color);
+
+  // tft.drawLine((x + 8), (y + 8), (x + 9), (y + 7), color);
+  tft.drawLine((x + 9), (y + 7), (x + 12), (y + 10), color);
+  tft.drawLine((x + 11), (y + 11), (x + 12), (y + 10), color);
+  tft.drawLine((x + 8), (y + 8), (x + 11), (y + 11), color);
+
+  tft.drawLine((x + 2), (y + 9), (x + 3), (y + 10), color);
+  tft.drawPixel((x + 2), (y + 10), color);
+
+  tft.drawLine(x, (y + 9), x, (y + 10), color);
+  tft.drawPixel(x, (y + 10), color);
+  tft.drawLine((x + 2), (y + 12), (x + 3), (y + 12), color);
 }
 
 //void displayText(uint16_t x, uint16_t y, char *text , uint16_t color, uint16_t bgcolor) {
