@@ -82,6 +82,7 @@ void loop() {
 
   if (millis() > 5000 && gps.charsProcessed() < 10) {
     Serial.println("Fehler: GPS Modul nicht gefunden");
+    displayText(4, 70, "Fehler: GPS Modul nicht gefunden", ST7735_RED, ST7735_BLACK);
     while(true);
   }
 }
@@ -103,6 +104,7 @@ void showPositionData() {
   }
  
   displayText(4, 50, "Coordinates", ST7735_WHITE, ST7735_BLACK);
+  drawSatellite(20, 50, ST7735_WHITE);
   
   // Refresh coordinates after a defined interval
   curTime = millis();
@@ -183,6 +185,30 @@ void drawFrame(){
   tft.drawLine(1,15,160,15,ST7735_WHITE);
   tft.drawLine(1,60,160,60,ST7735_WHITE);
   
+}
+
+void drawSatellite(uint16_t x, uint16_t y, uint16_t color){
+  tft.drawLine((x + 2), (y + 7), (x + 7), (y + 3), color);
+  tft.drawLine((x + 7), (y + 3), (x + 9), (y + 5), color);
+  tft.drawLine((x + 5), (y + 9), (x + 9), (y + 5), color);
+  tft.drawLine((x + 2), (y + 7), (x + 5), (y + 9), color);
+
+  tft.drawLine((x + 1), (y + 1), (x + 2), y, color);
+  tft.drawLine((x + 2), y, (x + 6), (y + 4), color);
+  tft.drawLine((x + 4), (y + 4), (x + 6), (y + 4), color);
+  tft.drawLine((x + 1), (y + 1), (x + 4), (y + 4), color);
+
+  tft.drawLine((x + 8), (y + 8), (x + 9), (y + 7), color);
+  tft.drawLine((x + 9), (y + 7), (x + 12), (y + 10), color);
+  tft.drawLine((x + 11), (y + 11), (x + 12), (y + 10), color);
+  tft.drawLine((x + 8), (y + 8), (x + 11), (y + 11), color);
+
+  tft.drawLine((x + 2), (y + 9), (x + 3), (y + 10), color);
+  tft.drawPixel((x + 2), (y + 10), color);
+
+  tft.drawLine(x, (y + 9), x, (y + 10), color);
+  tft.drawPixel(x, (y + 10), color);
+  tft.drawLine((x + 2), (y + 12), (x + 3), (y + 12), color);
 }
 
 //void displayText(uint16_t x, uint16_t y, char *text , uint16_t color, uint16_t bgcolor) {
