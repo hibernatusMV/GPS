@@ -22,19 +22,13 @@
 
 #define GPSTIME   5000 // GPS coordinates are shown every 5s
 
-#include <TinyGPS++.h>
+#include <Adafruit_GPS.h>
 #include <SoftwareSerial.h>
-#include <SPI.h>             // SPI for communication
 #include <Adafruit_GFX.h>    // Adafruit grafic library
 #include <Adafruit_ST7735.h> // Adafruit ST7735 library
 #include <Timezone.h>
 
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_PIN_CS, TFT_PIN_DC, TFT_PIN_RST);  // ST7735 library setup
-
-// Used digital pins for SoftwareSerial
-static const int RX = 3, TX = 4;
-// !!! connection speed GPS module: adaption to own hardware necessary if different
-static const uint32_t GPSBaud = 9600;
 
 // Change this to suit your Time Zone
 TimeChangeRule CEST = {"", Last, Sun, Mar, 2, 120};     
@@ -43,21 +37,45 @@ Timezone CE(CEST, CET);
 TimeChangeRule *tcr;
 time_t utc;   // Universal Time
 time_t ltime; // Local Time
+
 char UTCTime[32];
 char UTCDate[32];
 char localTime[32];
 char localDate[32];
 
-long  gpstimer;
-long  curTime;
-
-// Access to TinyGPS++ from gps
-TinyGPSPlus gps;
+uint32_t gpstimer;
+uint32_t curTime;
 
 // Emulated port to GPS module
-SoftwareSerial gpsPort(RX, TX);
+SoftwareSerial mySerial(3, 4);
+Adafruit_GPS gps(&mySerial);
+
+// Set GPSECHO to 'false' to turn off echoing the GPS data to the Serial console
+// Set to 'true' if you want to debug and listen to the raw GPS sentences
+#define GPSECHO  false
 
 void setup() {
+  // connection parameters to GP module
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("Adafruit GPS library test!");
+  
+  gps.begin(9600);
+
+  // turn on RMC (recommended minimum) and GGA (fix data) including altitude
+  gps.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
+
+  // Set the update rate
+  gps.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);   // 1 Hz update rate
+
+  // Request updates on antenna status, comment out to keep quiet
+  gps.sendCommand(PGCMD_ANTENNA);
+
+  delay(1000);
+  
+  // Ask for firmware version
+  mySerial.println(PMTK_Q_RELEASE);
+  
   /***
   * ST7735 Chip initialize (INITR_BLACKTAB / INITR_REDTAB / INITR_GREENTAB) 
   ***/
@@ -71,63 +89,60 @@ void setup() {
   tft.setTextSize(1);
 
   drawFrame();
-  
-  // connection parameters to GP module
-  gpsPort.begin(GPSBaud);
-  Serial.begin(9600);
 }
 
-void loop() {
-  while (gpsPort.available() > 0) // data available?
-    if (gps.encode(gpsPort.read())) {
-      showPositionData(); // yes, print output to display
-    }
+uint32_t timer = millis();
 
-  if (millis() > 5000 && gps.charsProcessed() < 10) {
-    Serial.println("Fehler: GPS Modul nicht gefunden");
-    drawSatellite(130, 25, ST7735_RED);
-    while(true);
+void loop() {
+  char c = gps.read();
+  // if you want to debug, this is a good time to do it!
+  if ((c) && (GPSECHO))
+    Serial.write(c);
+
+  // if a sentence is received, we can check the checksum, parse it...
+  if (gps.newNMEAreceived()) {
+    // a tricky thing here is if we print the NMEA sentence, or data
+    // we end up not listening and catching other sentences!
+    // so be very wary if using OUTPUT_ALLDATA and trytng to print out data
+    //Serial.println(gps.lastNMEA());   // this also sets the newNMEAreceived() flag to false
+
+    if (!gps.parse(gps.lastNMEA()))   // this also sets the newNMEAreceived() flag to false
+      return;  // we can fail to parse a sentence in which case we should just wait for another
+  }
+
+  // if millis() or timer wraps around, we'll just reset it
+  if (timer > millis())  timer = millis();
+
+  // approximately every 1 seconds or so, print out the current stats
+  if (millis() - timer > 1000) {
+    timer = millis(); // reset the timer
+    
+    showPositionData(); // print output to display 
   }
 }
 
 void showPositionData() {
-  if (gps.date.isValid() && gps.time.isValid()) {
-    displayText(4, 4, "Local Date & Time", ST7735_WHITE, ST7735_BLACK);
-    
-    utc = tmConvert_t(gps.date.year(), gps.date.month(), gps.date.day(), gps.time.hour(), gps.time.minute(), gps.time.second());
-    ltime = CE.toLocal(utc, &tcr);
-    sprintf(localTime, "%.02d:%.02d:%.02d", hour(ltime), minute(ltime), second(ltime));
-    sprintf(localDate, "%.02d.%02d.%d", day(ltime), month(ltime), year(ltime));
-    
-    displayText(4, 20, "Date : ", ST7735_WHITE, ST7735_BLACK);
-    displayText(4, 30, "Time : ", ST7735_WHITE, ST7735_BLACK);
-    
-    displayText(50, 20, localDate, ST7735_WHITE, ST7735_BLACK);
-    displayText(50, 30, localTime, ST7735_WHITE, ST7735_BLACK);
-  }
- 
-  displayText(4, 50, "Coordinates", ST7735_WHITE, ST7735_BLACK);
+  utc = tmConvert_t((2000 + gps.year), gps.month, gps.day, gps.hour, gps.minute, gps.seconds);
+  ltime = CE.toLocal(utc, &tcr);
+  sprintf(localTime, "%.02d:%.02d:%.02d", hour(ltime), minute(ltime), second(ltime));
+  sprintf(localDate, "%.02d.%02d.%d", day(ltime), month(ltime), year(ltime));
 
-  if (gps.location.isValid()) {
-    // GPS fix established
-    drawSatellite(130, 25, ST7735_GREEN);
-  } else {
-    // No GPS fix
+  displayText(50, 20, localDate, ST7735_WHITE, ST7735_BLACK);
+  displayText(50, 30, localTime, ST7735_WHITE, ST7735_BLACK);
+ 
+  if (gps.fix) {
     drawSatellite(130, 25, ST7735_WHITE);
-  }
-  
-  // Refresh coordinates after a defined interval
-  curTime = millis();
-//  if (gps.location.isValid() && (((curTime - gpstimer ) > GPSTIME ) || (curTime < gpstimer)))
-  if (gps.location.isValid()) {
+    
+    // Refresh coordinates after a defined interval
+    curTime = millis();
     if (((curTime - gpstimer ) > GPSTIME ) || (curTime < gpstimer)) {
       gpstimer = curTime;
       
-      int degLat = gps.location.lat();
-      float minutesRemainderLat = abs(gps.location.lat() - degLat) * 60;
+      int degLat = gps.latitudeDegrees;
+      float minutesRemainderLat = abs(gps.latitudeDegrees - degLat) * 60;
       int arcMinutesLat = minutesRemainderLat;
       int arcSecondsLat = (minutesRemainderLat - arcMinutesLat) * 60;
-
+  
       String latitude = (degLat < 10 ? "0" : "");
       latitude += degLat;
       latitude += ((char)247);
@@ -137,18 +152,17 @@ void showPositionData() {
       latitude += "' ";
       latitude += (arcSecondsLat < 10 ? "0" : "");
       latitude += arcSecondsLat;
-      latitude += "\"";
-      latitude += (gps.location.rawLat().negative ? " S" : " N");
-
-      displayText(4, 65, "Lat : ", ST7735_WHITE, ST7735_BLACK);
+      latitude += "\" ";
+      latitude += (gps.lat);
+  
       displayText(50, 65, latitude, ST7735_WHITE, ST7735_BLACK);
-      displayText(50, 75, "(" + String(gps.location.lat(), 6) + ")", ST7735_WHITE, ST7735_BLACK);
+      displayText(50, 75, "(" + String(gps.latitudeDegrees, 4) + ")", ST7735_WHITE, ST7735_BLACK);
       
-      int degLon = gps.location.lng();
-      float minutesRemainderLon = abs(gps.location.lng() - degLon) * 60;
+      int degLon = gps.longitudeDegrees;
+      float minutesRemainderLon = abs(gps.longitudeDegrees - degLon) * 60;
       int arcMinutesLon = minutesRemainderLon;
       int arcSecondsLon = (minutesRemainderLon - arcMinutesLon) * 60;
-
+  
       String longitude = (degLon < 10 ? "0" : "");
       longitude += degLon;
       longitude += ((char)247);
@@ -158,20 +172,23 @@ void showPositionData() {
       longitude += "' ";
       longitude += (arcSecondsLon < 10 ? "0" : "");
       longitude += arcSecondsLon;
-      longitude += "\"";
-      longitude += (gps.location.rawLng().negative ? " W" : " E");
-
-      displayText(4, 90, "Lon : ", ST7735_WHITE, ST7735_BLACK);
-      displayText(50,90, longitude, ST7735_WHITE, ST7735_BLACK);
-      displayText(50,100, "(" + String(gps.location.lng(), 6) + ")", ST7735_WHITE, ST7735_BLACK);
+      longitude += "\" ";
+      longitude += (gps.lon);
   
-      if (gps.altitude.isValid()) {
-        String alt = String((int) gps.altitude.meters());
-        alt += " m";
-        displayText(4, 110, "Alt : ", ST7735_WHITE, ST7735_BLACK);
-        displayText(50, 110, alt, ST7735_WHITE, ST7735_BLACK);
-      }
+      displayText(50,90, longitude, ST7735_WHITE, ST7735_BLACK);
+      displayText(50,100, "(" + String(gps.longitudeDegrees, 4) + ")", ST7735_WHITE, ST7735_BLACK);
+
+      int currentAltitude = (int) gps.altitude;
+      char buffer[10];
+      
+      sprintf(buffer, "%04d", currentAltitude);
+      
+      String alt = buffer;
+      alt += " m";
+      displayText(50, 110, alt, ST7735_WHITE, ST7735_BLACK);
     }
+  } else {
+    drawSatellite(130, 25, ST7735_RED);
   }
 }
 
@@ -190,7 +207,13 @@ void drawFrame(){
   tft.drawRect(0,0,160,128,ST7735_WHITE);
   tft.drawLine(1,15,160,15,ST7735_WHITE);
   tft.drawLine(1,60,160,60,ST7735_WHITE);
-  
+  displayText(4, 4, "Local Date & Time", ST7735_WHITE, ST7735_BLACK);
+  displayText(4, 20, "Date : ", ST7735_WHITE, ST7735_BLACK);
+  displayText(4, 30, "Time : ", ST7735_WHITE, ST7735_BLACK);
+  displayText(4, 50, "Coordinates", ST7735_WHITE, ST7735_BLACK);
+  displayText(4, 65, "Lat : ", ST7735_WHITE, ST7735_BLACK);
+  displayText(4, 90, "Lon : ", ST7735_WHITE, ST7735_BLACK);
+  displayText(4, 110, "Alt : ", ST7735_WHITE, ST7735_BLACK);
 }
 
 void drawSatellite(uint16_t x, uint16_t y, uint16_t color){
