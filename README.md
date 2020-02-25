@@ -39,4 +39,4 @@ GPS (Pin) - Arduino Nano
 ```
 
 **_Wiring_**
-![Wiring](https://github.com/hibernatusMV/GPS/tree/master/ArduinoNano_GPS_Wiring.jpg "Wiring")
+![Wiring](https://github.com/hibernatusMV/GPS/blob/master/ArduinoNano_GPS_Wiring.jpg "Wiring")
