@@ -10,14 +10,13 @@
   SoftwareSerial.h  
   Timezone.h  
 
-## Hardware Installation
-
 **_Components_**  
   Display: ST7735 1.8" 160×128 SPI TFT https://amzn.to/2Pou4WC  
   GPS Receiver: NEO-6M GPS Module (identical to Ublox) https://amzn.to/2VoHCFk  
   e.g. Nano V3.0 with Atmega328 CH340 (compatible to Arduino Nano V3) https://amzn.to/2T0fXsA  
 
-## Wiring
+## Hardware Installation
+### Wiring
 ```
 Display (Pin) - Arduino Nano (Pin)
  GND  (1) - GND  
