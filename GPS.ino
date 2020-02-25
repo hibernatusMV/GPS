@@ -37,13 +37,14 @@ Timezone CE(CEST, CET);
 TimeChangeRule *tcr;
 time_t utc;   // Universal Time
 time_t ltime; // Local Time
+
 char UTCTime[32];
 char UTCDate[32];
 char localTime[32];
 char localDate[32];
 
-long  gpstimer;
-long  curTime;
+uint32_t gpstimer;
+uint32_t curTime;
 
 // Emulated port to GPS module
 SoftwareSerial mySerial(3, 4);
@@ -91,6 +92,7 @@ void setup() {
 }
 
 uint32_t timer = millis();
+
 void loop() {
   char c = gps.read();
   // if you want to debug, this is a good time to do it!
@@ -175,8 +177,13 @@ void showPositionData() {
   
       displayText(50,90, longitude, ST7735_WHITE, ST7735_BLACK);
       displayText(50,100, "(" + String(gps.longitudeDegrees, 4) + ")", ST7735_WHITE, ST7735_BLACK);
-  
-      String alt = String((int) gps.altitude);
+
+      int currentAltitude = (int) gps.altitude;
+      char buffer[10];
+      
+      sprintf(buffer, "%04d", currentAltitude);
+      
+      String alt = buffer;
       alt += " m";
       displayText(50, 110, alt, ST7735_WHITE, ST7735_BLACK);
     }
