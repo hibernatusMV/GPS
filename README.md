@@ -17,7 +17,7 @@
   GPS Receiver: NEO-6M GPS Module (identical to Ublox) https://amzn.to/2VoHCFk  
   e.g. Nano V3.0 with Atmega328 CH340 (compatible to Arduino Nano V3) https://amzn.to/2T0fXsA  
 
-
+## Wiring
 ```
 Display (Pin) - Arduino Nano (Pin)
  GND  (1) - GND  
@@ -38,5 +38,4 @@ GPS (Pin) - Arduino Nano
  TX   - D3
 ```
 
-## Wiring
 ![Wiring](https://github.com/hibernatusMV/GPS/blob/master/ArduinoNano_GPS_Wiring.jpg "Wiring")
