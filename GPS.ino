@@ -1,3 +1,12 @@
+/*
+ * GPS Receiver
+ * Hardware:
+ *    Display: ST7735 1.8" 160×128 SPI TFT
+ *    GPS Receiver: NEO-6M GPS Module (identical to Ublox)
+ *    Nano V3.0 with Atmega328 CH340 (compatible to Arduino Nano V3)
+ * Copyright 2020 - Programmed by Marcus Vasi
+ */
+
 /* Display (Pin) - Arduino Nano
  *  GND  (1) - GND  
  *  VCC  (2) - 5V
@@ -20,7 +29,7 @@
 #define TFT_PIN_DC   9  // Arduino pin on display DC
 #define TFT_PIN_RST  8  // Arduino pin on display reset pin
 
-#define GPSTIME   5000 // GPS coordinates are shown every 5s
+#define GPSTIME   5000 // GPS coordinates are shown every 5s (Default)
 
 #include <Adafruit_GPS.h>
 #include <SoftwareSerial.h>
@@ -38,8 +47,6 @@ TimeChangeRule *tcr;
 time_t utc;   // Universal Time
 time_t ltime; // Local Time
 
-char UTCTime[32];
-char UTCDate[32];
 char localTime[32];
 char localDate[32];
 
@@ -75,39 +82,22 @@ void setup() {
   
   // Ask for firmware version
   mySerial.println(PMTK_Q_RELEASE);
-  
-  /***
-  * ST7735 Chip initialize (INITR_BLACKTAB / INITR_REDTAB / INITR_GREENTAB) 
-  ***/
-  tft.initR(INITR_BLACKTAB);
 
-  tft.setTextWrap(false);
-  tft.fillScreen(ST7735_BLACK);
-  tft.setRotation(1);
-  tft.setCursor(0, 0);
-  tft.setTextColor(ST7735_WHITE);
-  tft.setTextSize(1);
-
-  drawFrame();
+  initDisplay();
 }
 
 uint32_t timer = millis();
 
 void loop() {
   char c = gps.read();
-  // if you want to debug, this is a good time to do it!
+  // Debug
   if ((c) && (GPSECHO))
     Serial.write(c);
 
   // if a sentence is received, we can check the checksum, parse it...
   if (gps.newNMEAreceived()) {
-    // a tricky thing here is if we print the NMEA sentence, or data
-    // we end up not listening and catching other sentences!
-    // so be very wary if using OUTPUT_ALLDATA and trytng to print out data
-    //Serial.println(gps.lastNMEA());   // this also sets the newNMEAreceived() flag to false
-
-    if (!gps.parse(gps.lastNMEA()))   // this also sets the newNMEAreceived() flag to false
-      return;  // we can fail to parse a sentence in which case we should just wait for another
+    if (!gps.parse(gps.lastNMEA()))
+      return;
   }
 
   // if millis() or timer wraps around, we'll just reset it
@@ -115,8 +105,7 @@ void loop() {
 
   // approximately every 1 seconds or so, print out the current stats
   if (millis() - timer > 1000) {
-    timer = millis(); // reset the timer
-    
+    timer = millis(); // reset the timer  
     showPositionData(); // print output to display 
   }
 }
@@ -138,49 +127,18 @@ void showPositionData() {
     if (((curTime - gpstimer ) > GPSTIME ) || (curTime < gpstimer)) {
       gpstimer = curTime;
       
-      int degLat = gps.latitudeDegrees;
-      float minutesRemainderLat = abs(gps.latitudeDegrees - degLat) * 60;
-      int arcMinutesLat = minutesRemainderLat;
-      int arcSecondsLat = (minutesRemainderLat - arcMinutesLat) * 60;
-  
-      String latitude = (degLat < 10 ? "0" : "");
-      latitude += degLat;
-      latitude += ((char)247);
-      latitude += " ";
-      latitude += (arcMinutesLat < 10 ? "0" : "");
-      latitude += arcMinutesLat;
-      latitude += "' ";
-      latitude += (arcSecondsLat < 10 ? "0" : "");
-      latitude += arcSecondsLat;
-      latitude += "\" ";
-      latitude += (gps.lat);
+      String latitude = formatCoord(gps.latitudeDegrees, gps.lat);
   
       displayText(50, 65, latitude, ST7735_WHITE, ST7735_BLACK);
       displayText(50, 75, "(" + String(gps.latitudeDegrees, 4) + ")", ST7735_WHITE, ST7735_BLACK);
       
-      int degLon = gps.longitudeDegrees;
-      float minutesRemainderLon = abs(gps.longitudeDegrees - degLon) * 60;
-      int arcMinutesLon = minutesRemainderLon;
-      int arcSecondsLon = (minutesRemainderLon - arcMinutesLon) * 60;
-  
-      String longitude = (degLon < 10 ? "0" : "");
-      longitude += degLon;
-      longitude += ((char)247);
-      longitude += " ";
-      longitude += (arcMinutesLon < 10 ? "0" : "");
-      longitude += arcMinutesLon;
-      longitude += "' ";
-      longitude += (arcSecondsLon < 10 ? "0" : "");
-      longitude += arcSecondsLon;
-      longitude += "\" ";
-      longitude += (gps.lon);
+      String longitude = formatCoord(gps.longitudeDegrees, gps.lon);
   
       displayText(50,90, longitude, ST7735_WHITE, ST7735_BLACK);
       displayText(50,100, "(" + String(gps.longitudeDegrees, 4) + ")", ST7735_WHITE, ST7735_BLACK);
 
       int currentAltitude = (int) gps.altitude;
       char buffer[10];
-      
       sprintf(buffer, "%04d", currentAltitude);
       
       String alt = buffer;
@@ -201,6 +159,42 @@ time_t tmConvert_t(int YYYY, byte MM, byte DD, byte hh, byte mm, byte ss) {
   tmSet.Minute = mm;
   tmSet.Second = ss;
   return makeTime(tmSet); //convert to time_t
+}
+
+String formatCoord(float coordDegrees, char orientation){
+  int arcDeg = coordDegrees;
+  float minutesRemainder = abs(coordDegrees - arcDeg) * 60;
+  int arcMinutes = minutesRemainder;
+  int arcSeconds = (minutesRemainder - arcMinutes) * 60;
+  
+  String coordinate = (arcDeg < 10 ? "0" : "");
+  coordinate += arcDeg;
+  coordinate += ((char)247);
+  coordinate += " ";
+  coordinate += (arcMinutes < 10 ? "0" : "");
+  coordinate += arcMinutes;
+  coordinate += "' ";
+  coordinate += (arcSeconds < 10 ? "0" : "");
+  coordinate += arcSeconds;
+  coordinate += "\" ";
+  coordinate += orientation;
+  return coordinate;
+}
+
+void initDisplay(){
+  /***
+  * ST7735 Chip initialize (INITR_BLACKTAB / INITR_REDTAB / INITR_GREENTAB) 
+  ***/
+  tft.initR(INITR_BLACKTAB);
+
+  tft.setTextWrap(false);
+  tft.fillScreen(ST7735_BLACK);
+  tft.setRotation(1);
+  tft.setCursor(0, 0);
+  tft.setTextColor(ST7735_WHITE);
+  tft.setTextSize(1);
+
+  drawFrame();  
 }
 
 void drawFrame(){
@@ -226,7 +220,6 @@ void drawSatellite(uint16_t x, uint16_t y, uint16_t color){
   tft.drawLine((x + 2), y, (x + 6), (y + 4), color);
   tft.drawLine((x + 1), (y + 1), (x + 4), (y + 4), color);
 
-  // tft.drawLine((x + 8), (y + 8), (x + 9), (y + 7), color);
   tft.drawLine((x + 9), (y + 7), (x + 12), (y + 10), color);
   tft.drawLine((x + 11), (y + 11), (x + 12), (y + 10), color);
   tft.drawLine((x + 8), (y + 8), (x + 11), (y + 11), color);
@@ -239,7 +232,6 @@ void drawSatellite(uint16_t x, uint16_t y, uint16_t color){
   tft.drawLine((x + 2), (y + 12), (x + 3), (y + 12), color);
 }
 
-//void displayText(uint16_t x, uint16_t y, char *text , uint16_t color, uint16_t bgcolor) {
 void displayText(uint16_t x, uint16_t y, String text , uint16_t color, uint16_t bgcolor) {
   tft.setCursor(x, y);
   tft.setTextColor(color, bgcolor);
