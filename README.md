@@ -38,5 +38,5 @@ GPS (Pin) - Arduino Nano
  TX   - D3
 ```
 
-**_Wiring_**
+## Wiring
 ![Wiring](https://github.com/hibernatusMV/GPS/blob/master/ArduinoNano_GPS_Wiring.jpg "Wiring")
